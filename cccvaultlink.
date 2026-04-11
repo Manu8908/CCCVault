@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCCVault — Gestion des liens</title>
+<meta name="theme-color" content="#141414">
+<script type="module">
+/* ══ FIREBASE ══ */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
+import { getFirestore, collection, getDocs, doc, updateDoc, onSnapshot, query, orderBy } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAGOLnPEMNCD6jXpomfNyHWTk-dLCmV-7A",
+  authDomain: "cccvault-21de2.firebaseapp.com",
+  databaseURL: "https://cccvault-21de2-default-rtdb.firebaseio.com",
+  projectId: "cccvault-21de2",
+  storageBucket: "cccvault-21de2.firebasestorage.app",
+  messagingSenderId: "164268818636",
+  appId: "1:164268818636:web:07ff91857619a0fa344269"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const COLLECTION = 'cccvault_films';
+
+window._fs = { db, collection, getDocs, doc, updateDoc, onSnapshot, query, orderBy, COLLECTION };
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg:#141414; --surface:#1f1f1f; --surface2:#2a2a2a; --surface3:#333;
+  --red:#e50914; --green:#46d369; --gold:#f5c518;
+  --text:#e5e5e5; --muted:#808080; --border:#3a3a3a;
+  --radius:6px;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  font-family:'Inter',sans-serif;
+  background:var(--bg); color:var(--text);
+  min-height:100vh;
+}
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* ── HEADER ── */
+header {
+  position:sticky; top:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 32px;
+  background:rgba(20,20,20,.97);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+}
+.logo {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.8rem; letter-spacing:4px; color:var(--red);
+}
+.logo span { color:#fff; }
+.header-right { display:flex; align-items:center; gap:12px; }
+.sync-indicator {
+  display:flex; align-items:center; gap:6px;
+  font-size:.78rem; color:var(--muted);
+}
+.sync-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--muted);
+  transition:background .3s;
+}
+.sync-dot.live { background:var(--green); box-shadow:0 0 6px var(--green); }
+.sync-dot.saving { background:var(--gold); }
+
+/* ── TOOLBAR ── */
+.toolbar {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:16px 32px;
+  border-bottom:1px solid var(--border);
+  background:rgba(0,0,0,.3);
+}
+.search-box {
+  display:flex; align-items:center; gap:8px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:8px 14px; flex:1; max-width:320px;
+  transition:border-color .2s;
+}
+.search-box:focus-within { border-color:#fff; }
+.search-box input { background:none; border:none; outline:none; color:var(--text); font-family:inherit; font-size:.88rem; width:100%; }
+.filter-select {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--text); padding:8px 12px;
+  font-family:inherit; font-size:.82rem; cursor:pointer; outline:none;
+}
+.stats-pills { display:flex; gap:8px; margin-left:auto; }
+.pill {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:20px; padding:5px 14px;
+  font-size:.78rem; color:var(--muted);
+}
+.pill strong { color:var(--text); }
+.pill.green { border-color:var(--green); color:var(--green); }
+.pill.red   { border-color:var(--red);   color:var(--red); }
+
+/* ── TABLE ── */
+.table-wrap {
+  padding:24px 32px 60px;
+}
+table {
+  width:100%; border-collapse:collapse;
+}
+thead th {
+  text-align:left; padding:10px 14px;
+  font-size:.72rem; text-transform:uppercase; letter-spacing:.8px;
+  color:var(--muted); font-weight:600;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+tbody tr {
+  border-bottom:1px solid rgba(255,255,255,.04);
+  transition:background .15s;
+}
+tbody tr:hover { background:rgba(255,255,255,.03); }
+
+td {
+  padding:12px 14px;
+  font-size:.85rem;
+  vertical-align:middle;
+}
+
+/* poster cell */
+.td-poster {
+  width:52px;
+}
+.poster-thumb {
+  width:46px; aspect-ratio:2/3;
+  object-fit:cover; border-radius:3px;
+  background:var(--surface2);
+  display:block;
+}
+.poster-emoji {
+  width:46px; aspect-ratio:2/3;
+  background:var(--surface2); border-radius:3px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.4rem;
+}
+
+/* title cell */
+.td-title { min-width:160px; }
+.film-title { font-weight:600; margin-bottom:3px; }
+.film-meta { font-size:.74rem; color:var(--muted); }
+.type-badge {
+  display:inline-block; font-size:.62rem; font-weight:700;
+  padding:2px 7px; border-radius:3px; margin-left:6px;
+  background:rgba(42,122,228,.7); color:#fff;
+}
+
+/* link cell */
+.td-link { width:100%; max-width:0; }
+.link-wrap {
+  display:flex; align-items:center; gap:8px;
+}
+.link-input {
+  flex:1; background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--text);
+  padding:8px 12px; font-family:'Inter',monospace; font-size:.78rem;
+  outline:none; transition:border-color .2s, background .2s;
+  min-width:0;
+}
+.link-input:focus { border-color:#fff; background:var(--surface2); }
+.link-input.has-link { border-color:var(--green); }
+.link-input.has-link:focus { border-color:#fff; }
+
+/* status icon */
+.status-icon {
+  flex-shrink:0; width:22px; height:22px;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:.75rem;
+}
+.status-icon.ok  { background:rgba(70,211,105,.2); color:var(--green); }
+.status-icon.missing { background:rgba(229,9,20,.15); color:var(--red); }
+
+/* save btn */
+.save-btn {
+  flex-shrink:0;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--muted);
+  padding:7px 14px; font-family:inherit; font-size:.78rem; font-weight:600;
+  cursor:pointer; transition:all .2s; white-space:nowrap;
+}
+.save-btn:hover { border-color:#fff; color:#fff; }
+.save-btn.saving { border-color:var(--gold); color:var(--gold); }
+.save-btn.saved  { border-color:var(--green); color:var(--green); }
+
+/* episodes btn */
+.ep-toggle {
+  background:none; border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--muted);
+  padding:5px 10px; font-size:.72rem; cursor:pointer;
+  font-family:inherit; transition:all .2s; white-space:nowrap;
+}
+.ep-toggle:hover { border-color:#fff; color:#fff; }
+.ep-count { display:inline-block; margin-left:4px; background:var(--surface2); border-radius:10px; padding:1px 6px; font-size:.65rem; }
+
+/* episodes panel */
+.ep-panel {
+  display:none;
+  background:rgba(0,0,0,.4);
+  border-top:1px solid var(--border);
+}
+.ep-panel.open { display:block; }
+.ep-row {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 60px 10px 80px;
+  border-bottom:1px solid rgba(255,255,255,.04);
+}
+.ep-row:last-child { border:none; }
+.ep-label { font-size:.78rem; color:var(--muted); flex-shrink:0; min-width:120px; }
+
+/* watched badge */
+.watched-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:.68rem; padding:2px 7px; border-radius:10px;
+  background:rgba(70,211,105,.15); color:var(--green);
+}
+
+/* ── EMPTY / LOADING ── */
+.loading-row td { text-align:center; padding:60px; color:var(--muted); font-size:.9rem; }
+.empty-row td { text-align:center; padding:60px; color:var(--muted); }
+
+/* ── TOAST ── */
+#toast {
+  position:fixed; bottom:28px; right:28px; z-index:999;
+  background:#222; border:1px solid var(--border);
+  border-radius:8px; padding:12px 20px;
+  font-size:.85rem; color:var(--text);
+  opacity:0; transform:translateY(8px);
+  transition:opacity .25s, transform .25s;
+  pointer-events:none;
+  display:flex; align-items:center; gap:8px;
+  max-width:340px;
+}
+#toast.show { opacity:1; transform:translateY(0); }
+#toast.success { border-color:var(--green); }
+#toast.error   { border-color:var(--red); }
+
+/* ── INFO BOX ── */
+.info-box {
+  margin:20px 32px;
+  background:rgba(31,128,255,.08);
+  border:1px solid rgba(31,128,255,.25);
+  border-radius:8px; padding:14px 18px;
+  font-size:.82rem; color:#6ec3ff; line-height:1.6;
+}
+.info-box strong { color:#fff; }
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px) {
+  header, .toolbar, .table-wrap { padding-left:16px; padding-right:16px; }
+  .ep-row { padding-left:16px; padding-right:16px; }
+  .stats-pills { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">CCC<span>Vault</span> <span style="font-size:1rem;letter-spacing:1px;color:var(--muted);font-family:'Inter',sans-serif;font-weight:500;">Links</span></div>
+  <div class="header-right">
+    <div class="sync-indicator">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">Connexion…</span>
+    </div>
+  </div>
+</header>
+
+<!-- INFO -->
+<div class="info-box">
+  <strong>Comment ça marche :</strong> Colle une URL directe (<code>https://…</code>) dans le champ lien à côté de chaque film.
+  Le lien est sauvegardé dans Firebase Firestore en temps réel — tous les utilisateurs de CCCVault voient automatiquement le lien mis à jour et peuvent lancer la vidéo depuis l'app.
+  Pour les séries, clique <strong>Épisodes</strong> pour gérer les liens par épisode.
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="search-box">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="searchInput" placeholder="Rechercher un titre…" oninput="renderTable()">
+  </div>
+  <select class="filter-select" id="typeFilter" onchange="renderTable()">
+    <option value="all">Tous les types</option>
+    <option value="Film">Films</option>
+    <option value="Série">Séries</option>
+    <option value="Anime">Animés</option>
+    <option value="Documentaire">Documentaires</option>
+  </select>
+  <select class="filter-select" id="linkFilter" onchange="renderTable()">
+    <option value="all">Tous</option>
+    <option value="missing">Sans lien</option>
+    <option value="has">Avec lien</option>
+  </select>
+  <div class="stats-pills">
+    <div class="pill">Total : <strong id="statTotal">—</strong></div>
+    <div class="pill green">Avec lien : <strong id="statLinked">—</strong></div>
+    <div class="pill red">Sans lien : <strong id="statMissing">—</strong></div>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="table-wrap">
+  <table id="mainTable">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Titre</th>
+        <th style="width:100%;">Lien vidéo (URL directe)</th>
+        <th>Statut</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr class="loading-row"><td colspan="5">⏳ Connexion à Firebase…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════
+   STATE
+══════════════════════════════════════ */
+let films = [];        // live copy from Firestore
+let openEpPanels = {}; // which episode panels are open
+
+/* ══════════════════════════════════════
+   FIREBASE REALTIME LISTENER
+══════════════════════════════════════ */
+function initFirebase() {
+  const { db, collection, onSnapshot, query, orderBy, COLLECTION } = window._fs;
+  setSyncState('connecting');
+
+  // Listen to entire collection in real-time
+  const q = collection(db, COLLECTION);
+  onSnapshot(q, (snapshot) => {
+    films = [];
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      films.push({ _docId: docSnap.id, ...data });
+    });
+    // Sort by title
+    films.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    setSyncState('live');
+    renderTable();
+    updateStats();
+  }, (err) => {
+    console.error('Firestore error:', err);
+    setSyncState('error');
+    showToast('❌ Erreur de connexion Firebase', 'error');
+  });
+}
+
+function setSyncState(state) {
+  const dot   = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  dot.className = 'sync-dot';
+  if (state === 'live')        { dot.classList.add('live'); label.textContent = 'Temps réel'; }
+  else if (state === 'saving') { dot.classList.add('saving'); label.textContent = 'Sauvegarde…'; }
+  else if (state === 'error')  { label.textContent = 'Hors ligne'; }
+  else                         { label.textContent = 'Connexion…'; }
+}
+
+/* ══════════════════════════════════════
+   SAVE LINK — film principal
+══════════════════════════════════════ */
+async function saveLink(docId, url, btnEl) {
+  const { db, doc, updateDoc, COLLECTION } = window._fs;
+  btnEl.textContent = '⏳'; btnEl.className = 'save-btn saving';
+  setSyncState('saving');
+  try {
+    const filmRef = doc(db, COLLECTION, String(docId));
+    await updateDoc(filmRef, { path: url.trim() });
+    btnEl.textContent = '✓ Sauvé'; btnEl.className = 'save-btn saved';
+    showToast('✅ Lien mis à jour !', 'success');
+    setTimeout(() => {
+      btnEl.textContent = 'Sauvegarder'; btnEl.className = 'save-btn';
+    }, 2000);
+  } catch (err) {
+    console.error(err);
+    btnEl.textContent = 'Erreur'; btnEl.className = 'save-btn';
+    showToast('❌ Erreur : ' + err.message, 'error');
+  }
+}
+
+/* ══════════════════════════════════════
+   SAVE LINK — épisode
+══════════════════════════════════════ */
+async function saveEpisodeLink(docId, epIdx, url, btnEl) {
+  const { db, doc, updateDoc, COLLECTION } = window._fs;
+  const film = films.find(f => f._docId === String(docId));
+  if (!film) return;
+  btnEl.textContent = '⏳'; btnEl.className = 'save-btn saving';
+  setSyncState('saving');
+  try {
+    const episodes = [...(film.episodes || [])];
+    if (!episodes[epIdx]) return;
+    episodes[epIdx] = { ...episodes[epIdx], path: url.trim() };
+    const filmRef = doc(db, COLLECTION, String(docId));
+    await updateDoc(filmRef, { episodes });
+    btnEl.textContent = '✓'; btnEl.className = 'save-btn saved';
+    showToast(`✅ Épisode ${episodes[epIdx].num} mis à jour !`, 'success');
+    setTimeout(() => { btnEl.textContent = 'OK'; btnEl.className = 'save-btn'; }, 2000);
+  } catch (err) {
+    btnEl.textContent = 'Err'; btnEl.className = 'save-btn';
+    showToast('❌ Erreur : ' + err.message, 'error');
+  }
+}
+
+/* ══════════════════════════════════════
+   RENDER TABLE
+══════════════════════════════════════ */
+function renderTable() {
+  const q    = document.getElementById('searchInput').value.toLowerCase();
+  const type = document.getElementById('typeFilter').value;
+  const link = document.getElementById('linkFilter').value;
+
+  let filtered = films.filter(f => {
+    if (q && !(f.title||'').toLowerCase().includes(q)) return false;
+    if (type !== 'all' && f.type !== type) return false;
+    const hasLink = !!(f.path && f.path.trim() && f.path.startsWith('http'));
+    if (link === 'has'     && !hasLink) return false;
+    if (link === 'missing' &&  hasLink) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('tableBody');
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Aucun titre trouvé</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(f => {
+    const hasLink = !!(f.path && f.path.trim() && f.path.startsWith('http'));
+    const isSeries = f.type === 'Série' || f.type === 'Anime';
+    const epCount  = (f.episodes || []).length;
+    const epLinked = (f.episodes || []).filter(e => e.path && e.path.startsWith('http')).length;
+    const isOpen   = !!openEpPanels[f._docId];
+
+    const posterHtml = f.poster
+      ? `<img class="poster-thumb" src="${f.poster}" alt="${f.title}" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="poster-emoji">${f.emoji || '🎬'}</div>`;
+
+    const statusHtml = hasLink
+      ? `<div class="status-icon ok" title="Lien présent">✓</div>`
+      : `<div class="status-icon missing" title="Aucun lien">!</div>`;
+
+    const epBtnHtml = isSeries && epCount > 0
+      ? `<button class="ep-toggle" onclick="toggleEpPanel('${f._docId}')">
+           Épisodes <span class="ep-count">${epLinked}/${epCount}</span>
+         </button>`
+      : '';
+
+    const watchedHtml = f.watched
+      ? `<span class="watched-badge">✓ Vu</span>`
+      : '';
+
+    const epPanelHtml = (isSeries && epCount > 0 && isOpen)
+      ? `<tr class="ep-panel-row" id="ep-panel-${f._docId}"><td colspan="5">
+          <div class="ep-panel open">
+            ${(f.episodes || []).map((ep, idx) => {
+              const epHasLink = !!(ep.path && ep.path.startsWith('http'));
+              return `<div class="ep-row">
+                <div class="ep-label">E${ep.num} — ${ep.title || 'Épisode '+ep.num}</div>
+                <div class="link-wrap" style="flex:1;">
+                  <input type="url" class="link-input ${epHasLink?'has-link':''}"
+                    value="${ep.path || ''}"
+                    placeholder="https://…  lien direct vers cet épisode"
+                    id="ep-input-${f._docId}-${idx}"
+                    onkeydown="if(event.key==='Enter') saveEpisodeLink('${f._docId}',${idx},this.value,document.getElementById('ep-btn-${f._docId}-${idx}'))">
+                  <div class="status-icon ${epHasLink?'ok':'missing'}">${epHasLink?'✓':'!'}</div>
+                  <button class="save-btn" id="ep-btn-${f._docId}-${idx}"
+                    onclick="saveEpisodeLink('${f._docId}',${idx},document.getElementById('ep-input-${f._docId}-${idx}').value,this)">OK</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </td></tr>`
+      : '';
+
+    return `
+    <tr id="row-${f._docId}">
+      <td class="td-poster">${posterHtml}</td>
+      <td class="td-title">
+        <div class="film-title">${f.title || '—'} <span class="type-badge">${f.type || ''}</span></div>
+        <div class="film-meta">${f.year || ''} ${f.rating ? '· ★ '+f.rating : ''} ${watchedHtml}</div>
+      </td>
+      <td class="td-link">
+        <div class="link-wrap">
+          <input type="url" class="link-input ${hasLink?'has-link':''}"
+            value="${f.path || ''}"
+            placeholder="https://…  lien direct vers le fichier vidéo"
+            id="input-${f._docId}"
+            onkeydown="if(event.key==='Enter') saveLink('${f._docId}',this.value,document.getElementById('btn-${f._docId}'))">
+          ${epBtnHtml}
+        </div>
+      </td>
+      <td>${statusHtml}</td>
+      <td>
+        <button class="save-btn" id="btn-${f._docId}"
+          onclick="saveLink('${f._docId}',document.getElementById('input-${f._docId}').value,this)">
+          Sauvegarder
+        </button>
+      </td>
+    </tr>
+    ${epPanelHtml}`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════
+   EPISODE PANEL TOGGLE
+══════════════════════════════════════ */
+function toggleEpPanel(docId) {
+  openEpPanels[docId] = !openEpPanels[docId];
+  renderTable();
+  // Scroll to the row
+  setTimeout(() => {
+    const el = document.getElementById('row-'+docId);
+    if (el) el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }, 50);
+}
+
+/* ══════════════════════════════════════
+   STATS
+══════════════════════════════════════ */
+function updateStats() {
+  const total  = films.length;
+  const linked = films.filter(f => f.path && f.path.startsWith('http')).length;
+  document.getElementById('statTotal').textContent   = total;
+  document.getElementById('statLinked').textContent  = linked;
+  document.getElementById('statMissing').textContent = total - linked;
+}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
+// Wait for Firebase module to load
+function waitForFirebase(cb, n=0) {
+  if (window._fs) { cb(); }
+  else if (n < 40) { setTimeout(() => waitForFirebase(cb, n+1), 100); }
+  else { showToast('❌ Firebase non chargé', 'error'); }
+}
+waitForFirebase(initFirebase);
+</script>
+</body>
+</html>
